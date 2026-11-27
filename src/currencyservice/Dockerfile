@@ -12,23 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# ---------- Stage 1: builder (dependencies install) ----------
-FROM node:24.20.0-slim AS builder
+FROM node:24.20.0-alpine@sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a015ba7a4eaf AS builder
+
+# Some packages (e.g. @google-cloud/profiler) require additional
+# deps for post-install scripts
+RUN apk add --update --no-cache \
+    python3 \
+    make \
+    g++
 
 WORKDIR /usr/src/app
 
 COPY package*.json ./
 
-RUN npm install --only=production
+RUN npm ci --omit=dev
 
-# ---------- Stage 2: final (runtime image) ----------
-FROM node:24.20.0-slim
+FROM node:24.20.0-alpine@sha256:e67514e5d0f6c46656005e1b693b2ec9d52e80b641307de684d4a015ba7a4eaf
+
+ENV NODE_ENV=production
 
 WORKDIR /usr/src/app
 
-COPY --from=builder /usr/src/app/node_modules ./node_modules
+COPY --from=builder --chown=node:node /usr/src/app/node_modules ./node_modules
 
-COPY . .
+COPY --chown=node:node . .
+
+USER node
 
 EXPOSE 7000
 
